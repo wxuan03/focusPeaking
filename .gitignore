@@ -1,0 +1,28 @@
+# Python virtual environments
+focus_peaking_env/
+venv/
+env/
+.env/
+.venv/
+ENV/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Local development settings
+.env
+.env.local
+.env.development.local
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
