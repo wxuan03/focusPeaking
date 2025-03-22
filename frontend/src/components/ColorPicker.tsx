@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { cn } from '@/lib/utils';
 
@@ -13,12 +12,14 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
   onChange,
   className 
 }) => {
+  // Professional camera-like focus peaking colors
   const colors = [
-    { name: 'Red', value: '#FF4A4A' },
-    { name: 'Green', value: '#4AFF4A' },
-    { name: 'Blue', value: '#4A4AFF' },
-    { name: 'Yellow', value: '#FFFF4A' },
-    { name: 'White', value: '#FFFFFF' },
+    { name: 'Red (Sony)', value: '#FF3333' },
+    { name: 'White (Canon)', value: '#FFFFFF' },
+    { name: 'Yellow (Nikon)', value: '#FFFF00' },
+    { name: 'Blue (Fuji)', value: '#3333FF' },
+    { name: 'Green (Panasonic)', value: '#33FF33' },
+    { name: 'Magenta (Pro)', value: '#FF33FF' },
   ];
 
   return (
@@ -29,12 +30,18 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
           <button
             key={color.value}
             className={cn(
-              "color-chip transform",
+              "color-chip transform transition-all duration-200",
               selectedColor === color.value && "active"
             )}
-            style={{ backgroundColor: color.value }}
+            style={{ 
+              backgroundColor: color.value,
+              boxShadow: selectedColor === color.value ? `0 0 0 2px white, 0 0 0 4px ${color.value}` : 'none',
+              width: '24px',
+              height: '24px'
+            }}
             onClick={() => onChange(color.value)}
             aria-label={`Select ${color.name} focus peaking color`}
+            title={color.name}
           />
         ))}
       </div>

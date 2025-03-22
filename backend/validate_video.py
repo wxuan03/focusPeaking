@@ -115,7 +115,7 @@ def hex_to_bgr(hex_color):
 
 def apply_focus_peaking(frame, threshold=30, color=(0, 0, 255)):
     """
-    Apply focus peaking to a video frame using Sobel edge detection
+    Apply focus peaking to a video frame - mimicking camera focus peaking
     
     Args:
         frame: Input video frame
@@ -132,27 +132,28 @@ def apply_focus_peaking(frame, threshold=30, color=(0, 0, 255)):
         # Apply Gaussian blur to reduce noise
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         
-        # Use Sobel operator for edge detection
-        grad_x = cv2.Sobel(blurred, cv2.CV_64F, 1, 0, ksize=3)
-        grad_y = cv2.Sobel(blurred, cv2.CV_64F, 0, 1, ksize=3)
+        # Use Laplacian for edge detection
+        # Laplacian detects areas of rapid intensity change which correlates well with areas in focus
+        laplacian = cv2.Laplacian(blurred, cv2.CV_64F, ksize=3)
         
-        # Calculate gradient magnitude
-        magnitude = np.sqrt(grad_x**2 + grad_y**2)
+        # Get absolute values to detect both rising and falling edges
+        laplacian_abs = np.absolute(laplacian)
         
-        # Normalize and scale to 0-255
-        magnitude = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8UC1)
+        # Normalize to 0-255 range
+        laplacian_norm = cv2.normalize(laplacian_abs, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
         
-        # Create a mask where magnitude exceeds threshold
-        _, mask = cv2.threshold(magnitude, threshold, 255, cv2.THRESH_BINARY)
+        # Apply threshold to isolate the highest frequency details (sharpest edges)
+        _, edges = cv2.threshold(laplacian_norm, threshold, 255, cv2.THRESH_BINARY)
         
         # Create a blank image for the overlay
         overlay = np.zeros_like(frame)
         
-        # Set the color for focus areas
-        overlay[mask > 0] = color
+        # Set the color only for edge pixels
+        overlay[edges > 0] = color
         
         # Blend the original frame and the overlay
-        result = cv2.addWeighted(frame, 1, overlay, 0.7, 0)
+        # Using addWeighted with alpha value similar to camera implementations
+        result = cv2.addWeighted(frame, 1, overlay, 0.8, 0)
         
         return result
     except Exception as e:

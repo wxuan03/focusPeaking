@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def apply_focus_peaking(frame, threshold=30, color=(0, 0, 255)):
     """
-    Apply focus peaking to a video frame
+    Apply focus peaking to a video frame - mimicking camera focus peaking
     
     Args:
         frame: Input video frame
@@ -32,28 +32,33 @@ def apply_focus_peaking(frame, threshold=30, color=(0, 0, 255)):
         # Apply Gaussian blur to reduce noise
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         
-        # Use Sobel operator for edge detection
-        grad_x = cv2.Sobel(blurred, cv2.CV_64F, 1, 0, ksize=3)
-        grad_y = cv2.Sobel(blurred, cv2.CV_64F, 0, 1, ksize=3)
+        # Use Laplacian operator to detect areas of rapid intensity change
+        # This is better for focus peaking as it detects areas of high frequency detail
+        laplacian = cv2.Laplacian(blurred, cv2.CV_64F, ksize=3)
         
-        # Calculate gradient magnitude
-        magnitude = np.sqrt(grad_x**2 + grad_y**2)
+        # Get absolute values to capture both dark-to-light and light-to-dark edges
+        laplacian_abs = np.absolute(laplacian)
         
-        # Normalize and scale to 0-255
-        magnitude = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8UC1)
+        # Convert to 8-bit
+        laplacian_norm = cv2.normalize(laplacian_abs, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
         
-        # Create a mask where magnitude exceeds threshold
-        _, mask = cv2.threshold(magnitude, threshold, 255, cv2.THRESH_BINARY)
+        # Apply threshold to get only the sharpest edges (in-focus areas)
+        _, edges = cv2.threshold(laplacian_norm, threshold, 255, cv2.THRESH_BINARY)
+        
+        # Optional: thin the edges for cleaner outlines
+        kernel = np.ones((2, 2), np.uint8)
+        edges = cv2.morphologyEx(edges, cv2.MORPH_OPEN, kernel)
         
         # Create a blank image for the overlay
         overlay = np.zeros_like(frame)
         
-        # Set the color for focus areas
+        # Set the color only for edge pixels
         b, g, r = color
-        overlay[mask > 0] = [b, g, r]
+        overlay[edges > 0] = [b, g, r]
         
         # Blend the original frame and the overlay
-        result = cv2.addWeighted(frame, 1, overlay, 0.7, 0)
+        # Using lower alpha for more subtle highlighting like real cameras
+        result = cv2.addWeighted(frame, 1, overlay, 0.8, 0)
         
         return result
     except Exception as e:
@@ -98,4 +103,4 @@ def process_frame():
         return {'error': str(e)}, 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5001, debug=False)
