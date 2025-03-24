@@ -51,7 +51,7 @@ const Index = () => {
 
       <footer className="mt-12 text-center text-zinc-500 text-sm animate-fade-in">
         <p>
-          Place the sample video file in the public directory as "sample.mp4"
+          Turn focus peaking on and choose a color to see the effect, change the threshold and effect intensity in settings to desired levels 
         </p>
       </footer>
     </div>

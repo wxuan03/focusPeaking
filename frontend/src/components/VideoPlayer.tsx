@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { processFrame } from '@/services/focusPeaking';
-import ControlPanel, { FocusPeakingMode } from '@/components/ControlPanel';
+import ControlPanel from '@/components/ControlPanel';
 import { Play, Pause, Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -33,7 +33,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className }) => {
   const [color, setColor] = useState('#FF4A4A'); // Default red
   const [threshold, setThreshold] = useState(25); // Adjusted default for better results
   const [intensity, setIntensity] = useState(80); // New intensity control (percentage)
-  const [mode, setMode] = useState<FocusPeakingMode>('highlight'); // New mode option
   
   // Control visibility timeout
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -119,8 +118,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className }) => {
     
     const renderFocusPeaking = () => {
       if (video.readyState >= 2) { // HAVE_CURRENT_DATA or higher
-        // Add mode and intensity to the processing options
-        processFrame(video, canvas, color, threshold, enabled, intensity / 100, mode);
+        // Always use 'outline' mode
+        processFrame(video, canvas, color, threshold, enabled, intensity / 100, 'outline');
       }
       animationRef.current = requestAnimationFrame(renderFocusPeaking);
     };
@@ -135,7 +134,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className }) => {
         animationRef.current = null;
       }
     };
-  }, [enabled, color, threshold, intensity, mode]);
+  }, [enabled, color, threshold, intensity]);
   
   // Play/pause the video
   const togglePlay = () => {
@@ -187,11 +186,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className }) => {
   // Handle intensity change
   const handleIntensityChange = (newIntensity: number) => {
     setIntensity(newIntensity);
-  };
-  
-  // Handle mode change
-  const handleModeChange = (newMode: FocusPeakingMode) => {
-    setMode(newMode);
   };
   
   // Handle seek
@@ -297,10 +291,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className }) => {
           pointerEvents: 'none',
           opacity: enabled ? 1 : 0,
           transition: 'opacity 0.3s ease',
-          // Apply different blend modes based on the selected mode
-          mixBlendMode: mode === 'highlight' ? 'screen' : 
-                        mode === 'outline' ? 'normal' : 
-                        'overlay' // contrast mode
+          // Always use 'normal' blend mode for outlines
+          mixBlendMode: 'normal'
         }}
       />
       
@@ -419,8 +411,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className }) => {
               onThresholdChange={handleThresholdChange}
               intensity={intensity}
               onIntensityChange={handleIntensityChange}
-              mode={mode}
-              onModeChange={handleModeChange}
               className="hidden md:flex"
             />
           </div>
@@ -444,8 +434,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className }) => {
           onThresholdChange={handleThresholdChange}
           intensity={intensity}
           onIntensityChange={handleIntensityChange}
-          mode={mode}
-          onModeChange={handleModeChange}
           className="glassmorphism rounded-full px-3 py-2"
         />
       </div>

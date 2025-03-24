@@ -1,21 +1,19 @@
 // src/services/focusPeaking.ts
 
-// Create a Web Worker instance for focus peaking processing
-let worker: Worker | null = null;
-
 // Store the last request parameters to avoid unnecessary reprocessing
 let lastVideoWidth = 0;
 let lastVideoHeight = 0;
 
 /**
- * Process a video frame with camera-like focus peaking effect
- * Uses direct processing for reliability with a camera-like dotted pattern
+ * Process a video frame with camera-like focus peaking effect using outline mode
  * 
  * @param videoElement - The video element to process
  * @param canvasElement - The canvas to draw the focus peaking effect on
  * @param color - Highlight color for the focus peaking
  * @param threshold - Edge detection threshold (lower values = more sensitive)
  * @param enabled - Whether focus peaking is enabled
+ * @param intensity - The strength of the outline effect (0.0 to 1.0)
+ * @param mode - Always set to 'outline' but kept for API compatibility
  */
 export function processFrame(
   videoElement: HTMLVideoElement,
@@ -24,7 +22,7 @@ export function processFrame(
   threshold: number = 30,
   enabled: boolean = true,
   intensity: number = 0.8,
-  mode: string = 'highlight'
+  mode: string = 'outline' // Parameter kept for API compatibility
 ): void {
   // Skip processing if focus peaking is disabled
   if (!enabled) {
@@ -49,11 +47,25 @@ export function processFrame(
     return;
   }
 
-  // Draw the video frame
-  ctx.drawImage(videoElement, 0, 0);
+  // Clear the canvas
+  ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+  
+  // Draw the video frame to an off-screen canvas for processing
+  const offscreenCanvas = document.createElement('canvas');
+  offscreenCanvas.width = canvasElement.width;
+  offscreenCanvas.height = canvasElement.height;
+  const offscreenCtx = offscreenCanvas.getContext('2d');
+  
+  if (!offscreenCtx) {
+    console.error("Failed to get offscreen canvas context");
+    return;
+  }
+  
+  // Draw the video frame to the offscreen canvas
+  offscreenCtx.drawImage(videoElement, 0, 0);
   
   // Get image data for processing
-  const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+  const imageData = offscreenCtx.getImageData(0, 0, offscreenCanvas.width, offscreenCanvas.height);
   const data = imageData.data;
   const width = canvasElement.width;
   const height = canvasElement.height;
@@ -72,49 +84,48 @@ export function processFrame(
     }
   }
   
-  // Step 2: Apply edge detection
-  // Using simplified algorithm for reliability, but with parameters
-  // tuned to match camera focus peaking appearance
-  for (let y = 2; y < height - 2; y += 1) {
-    for (let x = 2; x < width - 2; x += 1) {
-      // Skip some pixels for performance while maintaining dotted pattern
-      if ((x + y) % 3 !== 0) continue;
-      
+  // Create a new ImageData for the outline only
+  const outlineData = new ImageData(width, height);
+  const outlinePixels = outlineData.data;
+  
+  // Apply outline edge detection optimized for focus peaking
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
       const centerIdx = y * width + x;
       
-      // Apply a simple edge detection kernel (approximated Laplacian)
-      const center = grayscale[centerIdx] * 4;
+      // Apply a simple edge detection kernel (Sobel operator)
+      const center = grayscale[centerIdx];
       const top = grayscale[(y-1) * width + x];
       const bottom = grayscale[(y+1) * width + x];
       const left = grayscale[y * width + (x-1)];
       const right = grayscale[y * width + (x+1)];
       
-      // Calculate edge response - high values indicate sharp edges
-      const edgeResponse = Math.abs(center - top - bottom - left - right);
+      // Calculate horizontal and vertical gradients
+      const gx = Math.abs(right - left);
+      const gy = Math.abs(bottom - top);
       
-      // Apply threshold - higher means less highlighting
+      // Combined gradient magnitude
+      const edgeResponse = Math.sqrt(gx*gx + gy*gy);
+      
+      // Apply threshold with intensity adjustment
       if (edgeResponse > threshold) {
-        // Calculate how much above threshold - higher means sharper edge
-        const edgeStrength = Math.min(1.0, (edgeResponse - threshold) / 100);
+        const outlineIdx = (y * width + x) * 4;
         
-        // Use a deterministic pattern to create the dotted/speckled effect
-        // based on pixel position and edge strength
-        const patternValue = ((x * 12345 + y * 67890) % 100) / 100;
+        // Calculate alpha based on edge strength and intensity
+        const edgeStrength = Math.min(255, (edgeResponse - threshold) * 2);
+        const alpha = Math.min(255, edgeStrength * intensity);
         
-        // Only highlight if pattern value is below edge strength
-        // This creates a dotted pattern that's denser on sharper edges
-        if (patternValue < edgeStrength) {
-          const idx = centerIdx * 4;
-          data[idx] = colorRgb.r;
-          data[idx + 1] = colorRgb.g;
-          data[idx + 2] = colorRgb.b;
-        }
+        // Set pixel color with calculated alpha
+        outlinePixels[outlineIdx] = colorRgb.r;     // R
+        outlinePixels[outlineIdx + 1] = colorRgb.g; // G
+        outlinePixels[outlineIdx + 2] = colorRgb.b; // B
+        outlinePixels[outlineIdx + 3] = alpha;      // A
       }
     }
   }
   
-  // Put the image data back
-  ctx.putImageData(imageData, 0, 0);
+  // Draw the outline to the main canvas
+  ctx.putImageData(outlineData, 0, 0);
 }
 
 /**

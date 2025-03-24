@@ -8,8 +8,19 @@ echo "=========================================================="
 echo "  Starting Focus Peaking Visualizer (Development Mode)"
 echo "=========================================================="
 
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+# Navigate to project root (assuming script is in scripts/ directory)
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." &> /dev/null && pwd )"
+
+# Check if frontend directory exists
+if [ ! -d "$PROJECT_ROOT/frontend" ]; then
+    echo "Error: frontend directory not found at $PROJECT_ROOT/frontend"
+    exit 1
+fi
+
 # Change to frontend directory
-cd frontend
+cd "$PROJECT_ROOT/frontend"
 
 # Check if Node.js is installed
 if ! command -v node &> /dev/null; then
@@ -29,22 +40,57 @@ if [ ! -f "public/videos/sample.mp4" ]; then
     echo "and place it in the public/videos directory."
 fi
 
+# Check if backend directory exists
+if [ ! -d "$PROJECT_ROOT/backend" ]; then
+    echo "Warning: Backend directory not found at $PROJECT_ROOT/backend"
+    echo "The application may not function correctly without the backend."
+fi
+
+# Start Python backend server if it exists
+BACKEND_PID=""
+if [ -d "$PROJECT_ROOT/backend" ]; then
+    echo "Starting Python backend server..."
+    cd "$PROJECT_ROOT/backend"
+    
+    # Check for virtual environment
+    if [ -d "venv" ]; then
+        echo "Activating virtual environment..."
+        source venv/bin/activate
+        python server.py &
+        BACKEND_PID=$!
+        deactivate
+    else
+        echo "Virtual environment not found, using system Python..."
+        python3 server.py &
+        BACKEND_PID=$!
+    fi
+    
+    echo "Backend server started."
+    
+    # Go back to frontend directory
+    cd "$PROJECT_ROOT/frontend"
+fi
+
 # Start React development server
 echo "Starting React frontend..."
 npm run dev &
 FRONTEND_PID=$!
 
-# Wait for a moment to let the server start
+# Wait for a moment to let the servers start
 sleep 3
 
 echo ""
 echo "=========================================================="
 echo "  Focus Peaking Visualizer is running in Development Mode!"
 echo "=========================================================="
-echo "Access the application at: http://localhost:8080"
+echo "Access the application at the URL shown above (likely http://localhost:5173)"
 echo ""
 echo "Press Ctrl+C to stop the servers."
 
 # Wait for Ctrl+C
-trap "kill $FRONTEND_PID; echo 'Shutting down...'; exit 0" INT TERM
+if [ -n "$BACKEND_PID" ]; then
+    trap "kill $FRONTEND_PID $BACKEND_PID; echo 'Shutting down frontend and backend...'; exit 0" INT TERM
+else
+    trap "kill $FRONTEND_PID; echo 'Shutting down frontend...'; exit 0" INT TERM
+fi
 wait
